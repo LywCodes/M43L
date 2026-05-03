@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 import static ita.enumeration.EntityType.USER_TYPE;
@@ -90,6 +91,18 @@ public class UserController {
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getUser(),
                 responseProperty.getSuccess().getMessage().getUser(), ResponseDtoUtil.generateDeleteMessage(id, USER_TYPE));
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
+
+    @GetMapping("/approvers")
+    @GenerateAuditLog(entityType = USER_TYPE, operationType = READ_OPERATION)
+    @PreAuthorize("hasAuthority('CREATE_CAMPAIGN')")
+    public ResponseEntity<ResponseDto<Object>> getApproverList() {
+        List<ApproverSelectionDto> response = userService.getApprover();
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getUser(),
+                responseProperty.getSuccess().getMessage().getUser(), response);
 
         return ResponseEntity.status(200).body(responseDto);
     }

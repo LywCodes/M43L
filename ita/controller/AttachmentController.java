@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -61,7 +62,7 @@ public class AttachmentController {
     @PreAuthorize("hasAuthority('CREATE_ATTACHMENT')")
     @GenerateRequestLog(entityType = ATTACHMENT_TYPE, operationType = ADD_OPERATION)
     @GenerateAuditLog(entityType = ATTACHMENT_TYPE, operationType = ADD_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> uploadAttachment(@Valid @ModelAttribute AttachmentRequestDto attachmentRequestDto) throws IOException, NoSuchMethodException {
+    public ResponseEntity<ResponseDto<Object>> uploadAttachment(@Valid @ModelAttribute AttachmentRequestDto attachmentRequestDto) throws IOException, MethodArgumentNotValidException, NoSuchMethodException {
         attachmentService.uploadAttachment(attachmentRequestDto);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getAttachment(),

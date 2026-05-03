@@ -1,74 +1,121 @@
-//package ita.config;
-//
-//import org.springframework.context.ApplicationContext;
-//import org.springframework.context.annotation.Bean;
-//import org.springframework.context.annotation.Configuration;
-//import org.springframework.scheduling.quartz.SchedulerFactoryBean;
-//
-//@Configuration
-//public class QuartzConfig {
-//
-//    private final ApplicationContext applicationContext;
-//
-//    public QuartzConfig(ApplicationContext applicationContext) {
-//        this.applicationContext = applicationContext;
-//    }
-//
-//    @Bean
-//    public SchedulerFactoryBean schedulerFactoryBean() {
-//        // Buat Job Factory yang "sadar" akan Spring
-//        AutowiringSpringBeanJobFactory jobFactory = new AutowiringSpringBeanJobFactory();
-//        jobFactory.setApplicationContext(applicationContext);
-//
-//        // Buat Scheduler Factory
-//        SchedulerFactoryBean factory = new SchedulerFactoryBean();
-//        factory.setJobFactory(jobFactory);
-//        factory.setOverwriteExistingJobs(true); // Ganti job yang sudah ada jika ada perubahan
-//
-//        factory.setAutoStartup(true);
-//
-//        return factory;
-//    }
-//}
-
-
 package ita.config;
 
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.boot.quartz.autoconfigure.QuartzProperties;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 import javax.sql.DataSource;
 import java.util.Properties;
+//old
+//@Configuration
+//public class QuartzConfig {
+//
+//    @Autowired
+//    private ApplicationContext applicationContext;
+//
+//    @Autowired
+//    private DataSource dataSource;
+//
+//    @Autowired
+//    private QuartzProperties quartzProperties;
+//
+//    @Bean
+//    public SchedulerFactoryBean schedulerFactoryBean() {
+//        JobFactoryConfig jobFactory = new JobFactoryConfig();
+//
+//        jobFactory.setApplicationContext(applicationContext);
+//
+//        SchedulerFactoryBean factory = new SchedulerFactoryBean();
+//
+//        factory.setDataSource(dataSource);
+//        factory.setQuartzProperties(getQuartzProperties());
+//        factory.setJobFactory(jobFactory);
+//        factory.setOverwriteExistingJobs(true);
+//        factory.setAutoStartup(true);
+//
+//        return factory;
+//    }
+//
+//    private Properties getQuartzProperties() {
+//        Properties properties = new Properties();
+//
+//        properties.putAll(quartzProperties.getProperties());
+//
+//        return properties;
+//    }
+//}
 
+//V1 WORK
 @Configuration
+@RequiredArgsConstructor
 public class QuartzConfig {
 
+    private final DataSource dataSource;
+    private final QuartzProperties quartzProperties;
+    private final AutowireCapableBeanFactory beanFactory;
+
     @Bean
-    public SchedulerFactoryBean schedulerFactoryBean(ApplicationContext applicationContext,
-                                                     DataSource dataSource,
-                                                     QuartzProperties quartzProperties) {
+    public AutowiringSpringBeanJobFactory quartzJobFactory() {
+        return new AutowiringSpringBeanJobFactory(beanFactory);
+    }
 
-        JobFactoryConfig jobFactory = new JobFactoryConfig();
-        jobFactory.setApplicationContext(applicationContext);
-
+    @Bean
+    public SchedulerFactoryBean schedulerFactoryBean(AutowiringSpringBeanJobFactory jobFactory) {
         SchedulerFactoryBean factory = new SchedulerFactoryBean();
+
         factory.setDataSource(dataSource);
-        factory.setQuartzProperties(getQuartzProperties(quartzProperties));
         factory.setJobFactory(jobFactory);
+        factory.setQuartzProperties(quartzProperties());
+
         factory.setOverwriteExistingJobs(true);
-        factory.setAutoStartup(true);
+        factory.setWaitForJobsToCompleteOnShutdown(true);
+        factory.setAutoStartup(true); //new
 
         return factory;
     }
 
-    private Properties getQuartzProperties(QuartzProperties quartzProperties) {
+    private Properties quartzProperties() {
         Properties properties = new Properties();
         properties.putAll(quartzProperties.getProperties());
-
         return properties;
     }
 }
+
+//v2
+//@Configuration
+//@RequiredArgsConstructor
+//public class QuartzConfig {
+//
+//    private final ApplicationContext applicationContext;
+//    private final DataSource dataSource;
+//    private final QuartzProperties quartzProperties;
+//
+//    @Bean
+//    public AutowiringSpringBeanJobFactory quartzJobFactory() {
+//        AutowiringSpringBeanJobFactory jobFactory = new AutowiringSpringBeanJobFactory();
+//        jobFactory.setApplicationContext(applicationContext);
+//        return jobFactory;
+//    }
+//
+//    @Bean
+//    public SchedulerFactoryBean schedulerFactoryBean(AutowiringSpringBeanJobFactory quartzJobFactory) {
+//        SchedulerFactoryBean factory = new SchedulerFactoryBean();
+//        factory.setDataSource(dataSource);
+//        factory.setQuartzProperties(quartzProperties());
+//        factory.setJobFactory(quartzJobFactory);
+//        factory.setOverwriteExistingJobs(true);
+//        factory.setAutoStartup(true);
+//        return factory;
+//    }
+//
+//    @Bean
+//    public Properties quartzProperties() {
+//        Properties properties = new Properties();
+//        properties.putAll(quartzProperties.getProperties());
+//        return properties;
+//    }
+//}

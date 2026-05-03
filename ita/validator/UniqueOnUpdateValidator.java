@@ -19,10 +19,18 @@ public class UniqueOnUpdateValidator implements ConstraintValidator<UniqueOnUpda
     private final ContactGroupService contactGroupService;
     private final PermissionService permissionService;
     private final AttachmentService attachmentService;
+    private final CampaignHeaderService  campaignHeaderService;
     private EntityType entityType;
     private String field;
 
-    public UniqueOnUpdateValidator(RoleService roleService, UserService userService, ContactService contactService, SenderService senderService, ContactGroupService contactGroupService, PermissionService permissionService, AttachmentService attachmentService) {
+    public UniqueOnUpdateValidator(RoleService roleService,
+                                   UserService userService,
+                                   ContactService contactService,
+                                   SenderService senderService,
+                                   ContactGroupService contactGroupService,
+                                   PermissionService permissionService,
+                                   AttachmentService attachmentService,
+                                   CampaignHeaderService campaignHeaderService) {
         this.roleService = roleService;
         this.userService = userService;
         this.contactService = contactService;
@@ -30,6 +38,7 @@ public class UniqueOnUpdateValidator implements ConstraintValidator<UniqueOnUpda
         this.contactGroupService = contactGroupService;
         this.permissionService = permissionService;
         this.attachmentService = attachmentService;
+        this.campaignHeaderService = campaignHeaderService;
     }
 
     @Override
@@ -77,6 +86,11 @@ public class UniqueOnUpdateValidator implements ConstraintValidator<UniqueOnUpda
                 PermissionUpdateDto permission = (PermissionUpdateDto) value;
 
                 isValid = permissionService.isUniqueForUpdate(permission.getName(), permission.getId());
+            }
+            case CAMPAIGN_HEADER_TYPE -> {
+                CampaignHeaderUpdateDto campaign = (CampaignHeaderUpdateDto) value;
+
+                isValid = !campaignHeaderService.existsByNameActiveAndIdNot(campaign.getName(), campaign.getId());
             }
             default -> isValid = false;
         }

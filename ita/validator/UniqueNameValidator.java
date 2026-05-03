@@ -20,7 +20,15 @@ public class UniqueNameValidator implements ConstraintValidator<UniqueName, Stri
     private final ContentService contentService;
     private EntityType entityType;
 
-    public UniqueNameValidator(RoleService roleService, UserService userService, ContactService contactService, CampaignHeaderService campaignHeaderService, SenderService senderService, ContactGroupService contactGroupService, PermissionService permissionService, AttachmentService attachmentService, ContentService contentService) {
+    public UniqueNameValidator(RoleService roleService,
+                               UserService userService,
+                               ContactService contactService,
+                               CampaignHeaderService campaignHeaderService,
+                               SenderService senderService,
+                               ContactGroupService contactGroupService,
+                               PermissionService permissionService,
+                               AttachmentService attachmentService,
+                               ContentService contentService) {
         this.roleService = roleService;
         this.userService = userService;
         this.contactService = contactService;
@@ -45,7 +53,7 @@ public class UniqueNameValidator implements ConstraintValidator<UniqueName, Stri
             case CONTENT_TYPE -> !contentService.existsByName(name);
             case USER_TYPE -> !userService.existsByUsername(name);
             case CONTACT_TYPE -> !contactService.existsByEmail(name);
-            case CAMPAIGN_HEADER_TYPE -> !campaignHeaderService.existsByName(name);
+            case CAMPAIGN_HEADER_TYPE -> !campaignHeaderService.existsByNameActive(name);
             case SENDER_TYPE -> !senderService.existsByEmail(name);
             case CONTACT_GROUP_TYPE -> !contactGroupService.existsByName(name);
             case PERMISSION_TYPE -> !permissionService.existsByName(name);

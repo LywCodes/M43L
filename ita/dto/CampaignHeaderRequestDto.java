@@ -10,6 +10,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 import static ita.enumeration.EntityType.CAMPAIGN_HEADER_TYPE;
 
 @Data
@@ -47,4 +49,7 @@ public class CampaignHeaderRequestDto {
 
     @NotNull(message = "{mandatory.string}")
     private Boolean isDraft;
+
+    @NotNull(message = "{mandatory.string}")
+    private UUID approverId;
 }

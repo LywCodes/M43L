@@ -49,4 +49,7 @@ public class CampaignHeaderUpdateDto {
 
     @NotNull(message = "{mandatory.string}")
     private Boolean isDraft;
+
+    @NotNull(message = "{mandatory.string}")
+    private UUID approverId;
 }

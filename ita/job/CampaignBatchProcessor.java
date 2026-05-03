@@ -12,7 +12,6 @@ import ita.util.ContentUtil;
 import ita.util.EmailUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
-
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,8 +26,6 @@ import static ita.util.ContentUtil.decodeBase64;
 @StepScope
 @Slf4j
 public class CampaignBatchProcessor implements ItemProcessor<Contact, EmailBatchDto> {
-    private final CampaignHeaderRepository campaignHeaderRepository;
-    private final ContactAttributeService contactAttributeService;
 
     @Value("${tracker.url}")
     private String trackerUrl;
@@ -44,8 +41,6 @@ public class CampaignBatchProcessor implements ItemProcessor<Contact, EmailBatch
                                   ContactAttributeService contactAttributeService,
                                   @Value("#{jobParameters['campaignHeaderId']}") String campaignHeaderId,
                                   @Value("#{jobParameters['contactGroupId']}") String contactGroupId) {
-        this.campaignHeaderRepository = campaignHeaderRepository;
-        this.contactAttributeService = contactAttributeService;
 
         if (campaignHeaderId != null && contactGroupId != null) {
             this.campaignHeader = campaignHeaderRepository.findById(UUID.fromString(campaignHeaderId)).orElseThrow();
@@ -57,7 +52,7 @@ public class CampaignBatchProcessor implements ItemProcessor<Contact, EmailBatch
     }
 
     @Override
-    public EmailBatchDto process(Contact contact) throws Exception {
+    public EmailBatchDto process(Contact contact)  {
         log.info("Processing Contact ID{}, email: {} by {}",contact.getId() ,contact.getEmail(), Thread.currentThread());
         String email = contact.getEmail();
         String trackerId = email.split("@")[0] + UUID.randomUUID();

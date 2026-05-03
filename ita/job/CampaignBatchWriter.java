@@ -6,7 +6,6 @@ import ita.dto.EmailTaskDto;
 import ita.entity.CampaignDetail;
 import ita.enumeration.CampaignDetailStatus;
 import ita.repository.CampaignDetailRepository;
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
@@ -52,7 +51,6 @@ public class CampaignBatchWriter implements ItemWriter<EmailBatchDto> {
 
                 String trackerId = item.getCampaignDetail().getTrackerId();
 
-                // kirim ke Kafka
                 try{
                     kafkaTemplate.send(emailTopic, trackerId, taskDto).get();
                 } catch (InterruptedException e){
@@ -71,15 +69,6 @@ public class CampaignBatchWriter implements ItemWriter<EmailBatchDto> {
 
                     campaignDetailRepository.save(failedDetail);
                 }
-//                kafkaTemplate.send(emailTopic, trackerId, taskDto).whenComplete((result, ex) -> {
-//                    if (ex != null) {
-//                        CampaignDetail failedDetail = item.getCampaignDetail();
-//                        failedDetail.setStatus(CampaignDetailStatus.SOFT_BOUNCED);
-//                        failedDetail.setSoftBouncedAt(System.currentTimeMillis());
-//                        failedDetail.setSentAt(0L);
-//                        campaignDetailRepository.save(failedDetail);
-//                    }
-//                });
             }
         }
     }

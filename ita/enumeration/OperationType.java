@@ -14,7 +14,9 @@ public enum OperationType {
     DELETE_OPERATION("Delete"),
     LOGIN_OPERATION("Login"),
     REGIST_OPERATION("Regist User"),
-    DOWNLOAD_OPERATION("Download");
+    DOWNLOAD_OPERATION("Download"),
+    APPROVE_OPERATION("Approve"),
+    REJECT_OPERATION("Reject");
 
     private final String value;
 }

@@ -36,11 +36,13 @@ public class CampaignHeaderController {
     @PreAuthorize("hasAuthority('CREATE_CAMPAIGN')")
     @GenerateRequestLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = ADD_OPERATION)
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = ADD_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> createScheduledCampaign(@Valid @RequestBody CampaignHeaderRequestDto request) throws SchedulerException {
+    public ResponseEntity<ResponseDto<Object>> createScheduledCampaign(@Valid @RequestBody CampaignHeaderRequestDto request) {
+
         campaignHeaderService.createScheduledCampaign(request);
 
-        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getCampaign(),
-                responseProperty.getSuccess().getMessage().getCampaign(), "Success");
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(
+                responseProperty.getSuccess().getCode().getCampaign(),
+                responseProperty.getSuccess().getMessage().getCampaign(), "success");
 
         return ResponseEntity.status(201).body(responseDto);
     }
@@ -50,7 +52,7 @@ public class CampaignHeaderController {
     @GenerateRequestLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = UPDATE_OPERATION)
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = UPDATE_OPERATION)
     public ResponseEntity<ResponseDto<Object>> updateCampaignHeader(@Valid @RequestBody CampaignHeaderUpdateDto request) throws SchedulerException, MethodArgumentNotValidException, NoSuchMethodException {
-        CampaignHeader campaignHeader = campaignHeaderService.updateCampaignHeader(request);
+        CampaignHeaderResponseDto campaignHeader = campaignHeaderService.updateCampaignHeader(request);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getCampaign(),
                 responseProperty.getSuccess().getMessage().getCampaign(), campaignHeader);
@@ -64,7 +66,8 @@ public class CampaignHeaderController {
     public ResponseEntity<ResponseDto<Object>> getAllCampaigns(CampaignHeaderSearchCriteria searchCriteria) {
         Page<CampaignHeader> campaigns = campaignHeaderService.getAllCampaigns(searchCriteria);
 
-        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getCampaign(),
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse
+                (responseProperty.getSuccess().getCode().getCampaign(),
                 responseProperty.getSuccess().getMessage().getCampaign(), campaigns);
 
         return ResponseEntity.status(200).body(responseDto);

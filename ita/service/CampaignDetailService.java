@@ -2,27 +2,23 @@ package ita.service;
 
 import ita.dto.CampaignDetailResponseDto;
 import ita.dto.CampaignHistorySearchCriteria;
-import ita.dto.EmailTaskDto;
 import ita.entity.*;
 import ita.enumeration.CampaignDetailStatus;
 import ita.exception.NotFoundException;
 import ita.repository.CampaignDetailRepository;
 import ita.specification.CampaignDetailSpecification;
 import lombok.extern.slf4j.Slf4j;
-
-
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -32,43 +28,20 @@ import static ita.enumeration.EntityType.CAMPAIGN_DETAIL_TYPE;
 @Service
 @Slf4j
 public class CampaignDetailService {
-    private final ContactAttributeService contactAttributeService;
     private final CampaignDetailRepository campaignDetailRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-
-    @Value("${tracker.url}")
-    private String trackerUrl;
-
-    @Value("${unsubscribe.url}")
-    private String unsubscribeUrl;
-
-    @Value("${spring.kafka.topic.email}")
-    private String emailTopic;
-
-    @Value("${param.header}")
-    private final String[] paramHeaders;
-
-    @Value("${param.seeding}")
-    private final String[] paramSeeding;
 
     private final JobOperator jobOperator;
     private final Job campaignBlastJob;
+    private final AsyncTaskExecutor campaignTaskExecutor;
 
     public CampaignDetailService(CampaignDetailRepository campaignDetailRepository,
-                                 KafkaTemplate<String, Object> kafkaTemplate,
-                                 String[] paramHeaders,
-                                 String[] paramSeeding,
-                                 ContactAttributeService contactAttributeService,
                                  JobOperator jobOperator,
-                                 @Qualifier("campaignBlastJob") Job campaignBlastJob
-                                ) {
+                                 @Qualifier("campaignBlastJob") Job campaignBlastJob,
+                                 AsyncTaskExecutor campaignTaskExecutor) {
         this.campaignDetailRepository = campaignDetailRepository;
-        this.kafkaTemplate = kafkaTemplate;
-        this.paramHeaders = paramHeaders;
-        this.paramSeeding = paramSeeding;
-        this.contactAttributeService = contactAttributeService;
         this.jobOperator = jobOperator;
         this.campaignBlastJob = campaignBlastJob;
+        this.campaignTaskExecutor = campaignTaskExecutor;
     }
 
     public Page<CampaignDetailResponseDto> findAllCampaignDetail(CampaignHistorySearchCriteria searchCriteria) {
@@ -112,7 +85,7 @@ public class CampaignDetailService {
     }
 
     public void createCampaign(CampaignHeader campaignHeader) {
-//        processEmailCommunication(campaignHeader);
+
         try {
             JobParameters jobParameters = new JobParametersBuilder()
                     .addString("campaignHeaderId", campaignHeader.getId().toString())
@@ -125,7 +98,7 @@ public class CampaignDetailService {
                 } catch (Exception e) {
                     log.error(e.getMessage(), e);
                 }
-            }, Executors.newVirtualThreadPerTaskExecutor());
+            }, campaignTaskExecutor);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new RuntimeException("failed to prepare campaign batch job", e);
@@ -155,12 +128,6 @@ public class CampaignDetailService {
 
     public void updateCampaign(CampaignDetail campaignDetail) {
         campaignDetailRepository.save(campaignDetail);
-    }
-
-    private String decodeBase64(String base64String) {
-        byte[] decodedBytes = Base64.getDecoder().decode(base64String);
-
-        return new String(decodedBytes, StandardCharsets.UTF_8);
     }
 
 }

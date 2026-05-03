@@ -1,12 +1,9 @@
 package ita.aspect;
 
 import io.micrometer.tracing.Tracer;
-import ita.dto.JwtResponseDto;
-import ita.dto.ResponseDto;
 import ita.enumeration.EntityType;
 import ita.enumeration.OperationType;
 import ita.util.AuthUtil;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -14,16 +11,12 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
 
 import static ita.enumeration.EntityType.*;
-import static ita.enumeration.OperationType.LOGIN_OPERATION;
 import static ita.enumeration.OperationType.READ_OPERATION;
 
 @Aspect

@@ -8,6 +8,7 @@ import ita.exception.LdapErrorHandler;
 import ita.exception.NotFoundException;
 import ita.repository.UserRepository;
 import ita.specification.UserSpecification;
+import ita.util.AuthUtil;
 import ita.util.JwtUtil;
 import jakarta.xml.bind.DatatypeConverter;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ import org.springframework.web.client.RestTemplate;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static ita.enumeration.EntityType.USER_TYPE;
 
@@ -92,6 +94,17 @@ public class UserService {
         if (user.isEmpty()) throw new NoSuchElementException(String.format("User with id %s not found", id));
 
         return user.get();
+    }
+
+    public String getUsernameById(UUID id) {
+        if(id.toString().equals("00000000-0000-0000-0000-000000000000")){
+            return "SYSTEM";
+        }
+        try{
+            return findById(id).getUsername();
+        }catch (NoSuchElementException e){
+            return "unknown user";
+        }
     }
 
     public LocalUser findByUsername(String username) {
@@ -202,6 +215,16 @@ public class UserService {
         } catch (Exception e) {
             throw new RuntimeException("Error encrypting data: " + e.getMessage(), e);
         }
+    }
+
+    public List<ApproverSelectionDto> getApprover() {
+        UUID currentUserId = AuthUtil.getUserId();
+
+        List<LocalUser> approvers = userRepository.findApprovers("APPROVER", currentUserId);
+
+        return approvers.stream()
+                .map(user -> new ApproverSelectionDto(user.getId(), user.getUsername()))
+                .collect(Collectors.toList());
     }
 
 }

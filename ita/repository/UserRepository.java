@@ -4,7 +4,9 @@ import ita.entity.LocalUser;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,5 +18,11 @@ public interface UserRepository extends JpaRepository<LocalUser, UUID>, JpaSpeci
 
     Optional<LocalUser> findByEmail(String email);
     Optional<LocalUser> findByUsernameIgnoreCase(String username);
+
+    @Query("SELECT u FROM LocalUser u " +
+            "JOIN u.roles r " +
+            "WHERE r.name = :roleName " +
+            "AND u.id <> :currentUserId")
+    List<LocalUser> findApprovers(@Param("roleName") String roleName, @Param("currentUserId") UUID currentUserId);
 
 }

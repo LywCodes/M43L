@@ -2,18 +2,15 @@ package ita.config;
 
 import ita.dto.EmailBatchDto;
 import ita.entity.Contact;
-
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.configuration.support.DefaultBatchConfiguration;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
-
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.batch.infrastructure.item.ItemReader;
-
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.database.JdbcPagingItemReader;
 import org.springframework.batch.infrastructure.item.database.Order;
@@ -24,7 +21,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
-
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -35,16 +31,6 @@ import java.util.UUID;
 
 @Configuration
 public class CampaignBatchConfig extends DefaultBatchConfiguration {
-
-//    @Bean
-//    public JobOperator jobOperator(JobRepository jobRepository,
-//                                   AsyncTaskExecutor campaignTaskExecutor) throws Exception {
-//        TaskExecutorJobOperator operator = new TaskExecutorJobOperator();
-//        operator.setJobRepository(jobRepository);
-//        operator.setTaskExecutor(campaignTaskExecutor);
-//        operator.afterPropertiesSet();
-//        return operator;
-//    }
 
     @Override
     protected TaskExecutor getTaskExecutor() {

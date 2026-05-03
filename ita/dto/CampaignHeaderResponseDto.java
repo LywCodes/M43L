@@ -23,5 +23,8 @@ public class CampaignHeaderResponseDto {
     private UUID attachmentId;
     private UUID contactGroupId;
     private Long scheduledTime;
-
+    private UUID requesterId;
+    private UUID approverId;
+    private String rejectionReason;
+    private Long createdAt;
 }

@@ -23,7 +23,7 @@ public class CampaignHeader {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "name", nullable = false, unique = true)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Column(name = "subject", nullable = false)
@@ -55,6 +55,15 @@ public class CampaignHeader {
     @JoinColumn(name = "contact_group_id", nullable = false)
     @JsonIgnore
     private ContactGroup contactGroup;
+
+    @Column(name = "requester_id")
+    private UUID requesterId;
+
+    @Column(name = "approver_id")
+    private UUID approverId;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @OnDelete(action = OnDeleteAction.CASCADE)

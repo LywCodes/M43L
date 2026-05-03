@@ -5,5 +5,8 @@ public enum CampaignStatus {
     IN_PROGRESS,
     SENT,
     FAILED,
-    DRAFT
+    DRAFT,
+    WAITING_APPROVAL,
+    CANCELED,
+    REJECTED
 }

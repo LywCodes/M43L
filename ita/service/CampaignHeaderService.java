@@ -9,9 +9,10 @@ import ita.exception.NotFoundException;
 import ita.job.CampaignExecutionJob;
 import ita.repository.CampaignHeaderRepository;
 import ita.specification.CampaignHeaderSpecification;
+import ita.util.AuthUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.core.MethodParameter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +31,7 @@ import java.lang.reflect.Method;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static ita.enumeration.CampaignStatus.*;
 import static ita.enumeration.CampaignType.IMMEDIATE;
@@ -47,7 +51,8 @@ public class CampaignHeaderService {
     private final Scheduler quartzScheduler;
     private final  ContentValidationService contentValidationService;
     private static final String CAMPAIGN_JOB = "campaign-jobs";
-    @Autowired
+    private final CampaignApprovalService approvalService;
+
     public CampaignHeaderService(CampaignHeaderRepository campaignHeaderRepository,
                                  CampaignDetailService campaignDetailService,
                                  SenderService senderService,
@@ -55,7 +60,8 @@ public class CampaignHeaderService {
                                  AttachmentService attachmentService,
                                  ContactGroupService contactGroupService,
                                  ContentValidationService contentValidationService,
-                                 Scheduler quartzScheduler) {
+                                 Scheduler quartzScheduler,
+                                 CampaignApprovalService approvalService) {
         this.campaignHeaderRepository = campaignHeaderRepository;
         this.campaignDetailService = campaignDetailService;
         this.senderService = senderService;
@@ -64,10 +70,13 @@ public class CampaignHeaderService {
         this.contactGroupService = contactGroupService;
         this.contentValidationService = contentValidationService;
         this.quartzScheduler = quartzScheduler;
+        this.approvalService = approvalService;
     }
 
+    @Transactional
     @GenerateServiceLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = ADD_OPERATION)
-    public CampaignHeader createScheduledCampaign(CampaignHeaderRequestDto request) throws SchedulerException {
+    public CampaignHeaderResponseDto createScheduledCampaign(CampaignHeaderRequestDto request) {
+
         Sender sender = senderService.findById(UUID.fromString(request.getSenderId()));
         Content content = contentService.findById(UUID.fromString(request.getContentId()));
         ContactGroup contactGroup = contactGroupService.findById(UUID.fromString(request.getContactGroupId()));
@@ -78,6 +87,14 @@ public class CampaignHeaderService {
         if (request.getAttachmentId() != null && !request.getAttachmentId().trim().isEmpty()) {
             attachment = attachmentService.findById(UUID.fromString(request.getAttachmentId()));
         }
+
+        CampaignStatus status = Boolean.TRUE.equals(request.getIsDraft()) ? DRAFT : WAITING_APPROVAL;
+        UUID userId = AuthUtil.getUserId();
+
+        if (userId.equals(request.getApproverId())) {
+            throw new CustomException("You can't sign yourself as approver for this campaign");
+        }
+
         CampaignHeader newCampaignHeader = CampaignHeader.builder()
                 .name(request.getName())
                 .subject(request.getSubject())
@@ -87,39 +104,34 @@ public class CampaignHeaderService {
                 .attachment(attachment)
                 .contactGroup(contactGroup)
                 .scheduledTime(request.getScheduledTime())
-                .status(Boolean.TRUE.equals(request.getIsDraft()) ? DRAFT : SCHEDULED)
+                .requesterId(userId)
+                .approverId(request.getApproverId())
+                .status(status)
                 .build();
 
         CampaignHeader campaignHeader = campaignHeaderRepository.save(newCampaignHeader);
 
-        if (request.getType() == IMMEDIATE) {
-            executeImmediateCampaign(campaignHeader);
-        } else {
-            scheduleQuartzJob(campaignHeader);
+        if (!Boolean.TRUE.equals(request.getIsDraft())) {
+            approvalService.submitForApproval(campaignHeader);
         }
 
-        return newCampaignHeader;
+        return mapToResponseDto(campaignHeader);
     }
 
-    public CampaignHeader updateCampaignHeader(CampaignHeaderUpdateDto campaignHeaderUpdateDto) throws SchedulerException, MethodArgumentNotValidException, NoSuchMethodException {
-        Sender sender = senderService.findById(UUID.fromString(campaignHeaderUpdateDto.getSenderId()));
-        Content content = contentService.findById(UUID.fromString(campaignHeaderUpdateDto.getContentId()));
-        ContactGroup contactGroup = contactGroupService.findById(UUID.fromString(campaignHeaderUpdateDto.getContactGroupId()));
-
-        validateCampaignBeforeSending(content.getId(), contactGroup.getId());
-
-        Attachment attachment = null;
-        if (campaignHeaderUpdateDto.getAttachmentId() != null && !campaignHeaderUpdateDto.getAttachmentId().trim().isEmpty()) {
-            attachment = attachmentService.findById(UUID.fromString(campaignHeaderUpdateDto.getAttachmentId()));
+    @Transactional
+    public CampaignHeaderResponseDto updateCampaignHeader(CampaignHeaderUpdateDto updateDto) throws MethodArgumentNotValidException, NoSuchMethodException {
+        CampaignHeader existing = findById(updateDto.getId());
+        if(existing.getStatus() != DRAFT){
+            throw new CustomException("Cannot update campaign that has been submitted.");
         }
 
-        CampaignHeader campaignHeaderFromDB = findById(campaignHeaderUpdateDto.getId());
+        if (!existing.getName().equals(updateDto.getName()) &&
+                campaignHeaderRepository.existsByNameActiveAndIdNot(updateDto.getName(), updateDto.getId())) {
 
-        if (!campaignHeaderFromDB.getName().equals(campaignHeaderUpdateDto.getName()) && Boolean.TRUE.equals(existsByName(campaignHeaderUpdateDto.getName()))) {
             Method method = this.getClass().getDeclaredMethod("updateCampaignHeader", CampaignHeaderUpdateDto.class);
             MethodParameter parameter = new MethodParameter(method, 0);
 
-            BeanPropertyBindingResult result = new BeanPropertyBindingResult(campaignHeaderUpdateDto, "name");
+            BeanPropertyBindingResult result = new BeanPropertyBindingResult(updateDto, "name");
 
             result.addError(new FieldError("name",
                     "name",
@@ -128,30 +140,90 @@ public class CampaignHeaderService {
             throw new MethodArgumentNotValidException(parameter, result);
         }
 
-        CampaignHeader newCampaignHeader = CampaignHeader.builder()
-                .id(campaignHeaderUpdateDto.getId())
-                .name(campaignHeaderUpdateDto.getName())
-                .subject(campaignHeaderUpdateDto.getSubject())
-                .type(campaignHeaderUpdateDto.getType())
-                .sender(sender)
-                .content(content)
-                .attachment(attachment)
-                .contactGroup(contactGroup)
-                .scheduledTime(campaignHeaderUpdateDto.getScheduledTime())
-                .status(Boolean.TRUE.equals(campaignHeaderUpdateDto.getIsDraft()) ? DRAFT : SCHEDULED)
-                .build();
+        Sender sender = senderService.findById(UUID.fromString(updateDto.getSenderId()));
+        Content content = contentService.findById(UUID.fromString(updateDto.getContentId()));
+        ContactGroup contactGroup = contactGroupService.findById(UUID.fromString(updateDto.getContactGroupId()));
 
-        CampaignHeader campaignHeader = campaignHeaderRepository.save(newCampaignHeader);
+        validateCampaignBeforeSending(content.getId(), contactGroup.getId());
 
-        if (campaignHeaderUpdateDto.getType().equals(IMMEDIATE)) {
-            executeImmediateCampaign(campaignHeader);
-        } else if (Boolean.TRUE.equals(campaignHeaderUpdateDto.getIsDraft())) {
-            return campaignHeader;
-        } else {
-            scheduleQuartzJob(campaignHeader);
+        Attachment attachment = null;
+        if (updateDto.getAttachmentId() != null && !updateDto.getAttachmentId().trim().isEmpty()) {
+            attachment = attachmentService.findById(UUID.fromString(updateDto.getAttachmentId()));
         }
 
-        return campaignHeader;
+        existing.setName(updateDto.getName());
+        existing.setSubject(updateDto.getSubject());
+        existing.setSender(sender);
+        existing.setContent(content);
+        existing.setAttachment(attachment);
+        existing.setContactGroup(contactGroup);
+        existing.setScheduledTime(updateDto.getScheduledTime());
+        existing.setType(updateDto.getType());
+        existing.setApproverId(updateDto.getApproverId());
+
+        if (!Boolean.TRUE.equals(updateDto.getIsDraft())) {
+            existing.setStatus(WAITING_APPROVAL);
+            approvalService.submitForApproval(existing);
+        }
+
+        CampaignHeader updated = campaignHeaderRepository.save(existing);
+
+        return mapToResponseDto(updated);
+    }
+
+    public CampaignHeaderResponseDto mapToResponseDto(CampaignHeader entity) {
+        return CampaignHeaderResponseDto.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .subject(entity.getSubject())
+                .type(entity.getType())
+                .status(entity.getStatus())
+                .senderId(entity.getSender() != null ? entity.getSender().getId() : null)
+                .contentId(entity.getContent() != null ? entity.getContent().getId() : null)
+                .attachmentId(entity.getAttachment() != null ? entity.getAttachment().getId() : null)
+                .contactGroupId(entity.getContactGroup() != null ? entity.getContactGroup().getId() : null)
+                .scheduledTime(entity.getScheduledTime())
+                .requesterId(entity.getRequesterId())
+                .approverId(entity.getApproverId())
+                .rejectionReason(entity.getRejectionReason())
+                .createdAt(entity.getCreatedAt())
+                .build();
+    }
+
+    public CampaignHeaderResponseDto findDtoById(UUID id) {
+        return mapToResponseDto(findById(id));
+    }
+
+    public void initiateExecution(CampaignHeader campaign) throws SchedulerException {
+        if (campaign.getType() == IMMEDIATE) {
+            executeImmediateCampaign(campaign);
+        } else {
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            scheduleQuartzJob(campaign);
+                        } catch (SchedulerException e) {
+                            log.error("quartz  scheduling failed", e);
+                        }
+                    }
+                });
+            } else {
+                scheduleQuartzJob(campaign);
+            }
+
+        }
+    }
+
+    public List<CampaignHeaderResponseDto>getPendingApprovals(){
+        UUID currentUserId = AuthUtil.getUserId();
+
+        List<CampaignHeader>pendingCampaigns = campaignHeaderRepository.findPendingApprovals(currentUserId);
+
+        return pendingCampaigns.stream()
+                .map(this::mapToResponseDto)
+                .collect(Collectors.toList());
     }
 
     public void executeCampaign(String campaignId) {
@@ -208,23 +280,6 @@ public class CampaignHeaderService {
                 .orElseThrow(() -> new NotFoundException(CAMPAIGN_HEADER_TYPE, "id", id.toString()));
     }
 
-    public CampaignHeaderResponseDto findDtoById(UUID id) {
-        CampaignHeader campaignHeader = findById(id);
-
-        return CampaignHeaderResponseDto.builder()
-                .id(campaignHeader.getId())
-                .name(campaignHeader.getName())
-                .subject(campaignHeader.getSubject())
-                .type(campaignHeader.getType())
-                .status(campaignHeader.getStatus())
-                .senderId(campaignHeader.getSender().getId())
-                .contentId(campaignHeader.getContent().getId())
-                .attachmentId(campaignHeader.getAttachment() != null ? campaignHeader.getAttachment().getId() : null)
-                .contactGroupId(campaignHeader.getContactGroup().getId())
-                .scheduledTime(campaignHeader.getScheduledTime())
-                .build();
-    }
-
     public void deleteCampaign(String campaignId) throws SchedulerException {
         UUID id = UUID.fromString(campaignId);
         CampaignHeader campaignHeader = findById(id);
@@ -268,6 +323,9 @@ public class CampaignHeaderService {
         if (campaignHeader.getQuartzJobId() != null) {
             JobKey jobKey = JobKey.jobKey(campaignHeader.getQuartzJobId(), CAMPAIGN_JOB);
             quartzScheduler.deleteJob(jobKey);
+
+//            Trigger trigger = TriggerBuilder.newTrigger().build();
+//            quartzScheduler.rescheduleJob(TriggerKey.triggerKey(jobKey.getName(), jobKey.getGroup()), trigger);
         }
 
         campaignHeader.setScheduledTime(rescheduleCampaignDto.getScheduledTime());
@@ -283,12 +341,23 @@ public class CampaignHeaderService {
         return campaignHeaderRepository.findAll(campaignHeaderSpecification);
     }
 
-    public Boolean existsByName(String name) {
-        return campaignHeaderRepository.existsByName(name);
+    public Boolean existsByNameActive(String name) {
+        return campaignHeaderRepository.existsByNameActive(name);
     }
 
-    private void scheduleQuartzJob(CampaignHeader campaignHeader) throws SchedulerException {
+    public Boolean existsByNameActiveAndIdNot(String name, UUID id) {
+        return campaignHeaderRepository.existsByNameActiveAndIdNot(name, id);
+    }
+
+    public void scheduleQuartzJob(CampaignHeader campaignHeader) throws SchedulerException {
         String jobId = "campaign-job-" + campaignHeader.getId().toString();
+
+        JobKey jobKey = JobKey.jobKey(jobId, CAMPAIGN_JOB);
+
+        if (quartzScheduler.checkExists(jobKey)) {
+            log.info("job quartz with id {} already exist, removing old job", jobId);
+            quartzScheduler.deleteJob(jobKey);
+        }
 
         JobDetail jobDetail = JobBuilder.newJob(CampaignExecutionJob.class)
                 .withIdentity(jobId, CAMPAIGN_JOB)
@@ -305,7 +374,7 @@ public class CampaignHeaderService {
         quartzScheduler.scheduleJob(jobDetail, trigger);
 
         campaignHeader.setQuartzJobId(jobId);
-        campaignHeader.setScheduledAt(System.currentTimeMillis());
+        campaignHeader.setScheduledAt(scheduledDate.getTime());
 
         campaignHeaderRepository.save(campaignHeader);
     }

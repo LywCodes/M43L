@@ -14,7 +14,7 @@ import static ita.enumeration.EntityType.ERROR_TYPE;
 import static ita.enumeration.OperationType.LOGIN_OPERATION;
 import static ita.util.ResponseDtoUtil.generatePayload;
 
-@ControllerAdvice(basePackages = "ita.controller")
+@ControllerAdvice(basePackages = "ita")
 public class SecurityExceptionHandler {
 
     private final ResponseProperty responseProperty;
@@ -38,6 +38,14 @@ public class SecurityExceptionHandler {
                 responseProperty.getAccessDenied().getMessage().getInvalid(), generatePayload("Access denied for this feature"));
 
         return ResponseEntity.status(403).body(responseDto);
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ResponseDto<Object>> handleAccessDenied(SecurityException exception) {
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getServerError().getCode(),
+                responseProperty.getServerError().getMessage(), generatePayload(exception.getMessage()));
+
+        return ResponseEntity.status(500).body(responseDto);
     }
 
 }

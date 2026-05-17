@@ -45,7 +45,6 @@ public class CampaignBatchConfig extends DefaultBatchConfiguration {
         return executor;
     }
 
-    //config Job
     @Bean
     public Job campaignBlastJob(JobRepository jobRepository, Step campaignBlastStep) {
         return new JobBuilder("campaignBlastJob", jobRepository)
@@ -53,7 +52,6 @@ public class CampaignBatchConfig extends DefaultBatchConfiguration {
                 .build();
     }
 
-    // config Step (Chunking & Multi-threading)
     @Bean
     public Step campaignBlastStep(JobRepository jobRepository,
                                   PlatformTransactionManager transactionManager,
@@ -62,7 +60,7 @@ public class CampaignBatchConfig extends DefaultBatchConfiguration {
                                   ItemWriter<EmailBatchDto> writer,
                                   AsyncTaskExecutor campaignTaskExecutor) {
         return new StepBuilder("campaignBlastStep", jobRepository)
-                .<Contact, EmailBatchDto>chunk(20) // Tarik x data per chunk
+                .<Contact, EmailBatchDto>chunk(20)
                 .reader(reader)
                 .transactionManager(transactionManager)
                 .processor(processor)
@@ -71,7 +69,6 @@ public class CampaignBatchConfig extends DefaultBatchConfiguration {
                 .build();
     }
 
-    // Item Reader paging
     @Bean
     @StepScope
     public JdbcPagingItemReader<Contact> contactItemReader(

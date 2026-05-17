@@ -1,6 +1,8 @@
 package ita.specification;
 
 import ita.entity.Sender;
+import ita.enumeration.ApprovalStatus;
+import ita.projection.AuditableProjection;
 import org.springframework.data.jpa.domain.Specification;
 
 public class SenderSpecification {
@@ -27,6 +29,11 @@ public class SenderSpecification {
 
             return criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), lowerSearchTerm);
         };
+    }
+
+    public static Specification<Sender>hasStatus(ApprovalStatus status) {
+        return ((root, query, criteriaBuilder) ->  status == null
+                ? criteriaBuilder.conjunction() : criteriaBuilder.equal(root.get("approvalStatus"), status));
     }
 
 }

@@ -2,6 +2,7 @@ package ita.exception;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ita.dto.LdapResponseDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpResponse;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.net.URI;
 
 @Component
+@Slf4j
 public class LdapErrorHandler implements ResponseErrorHandler {
 
     @Override
@@ -25,6 +27,8 @@ public class LdapErrorHandler implements ResponseErrorHandler {
         ObjectMapper objectMapper = new ObjectMapper();
 
         LdapResponseDto ldapResponseDto = objectMapper.readValue(response.getBody(), LdapResponseDto.class);
+
+        log.info("Response: {}", response.getBody());
 
         throw new BadCredentialsException(ldapResponseDto.getErrorSchema().getErrorMessage().getEnglish());
     }

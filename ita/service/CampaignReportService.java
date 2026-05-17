@@ -34,6 +34,7 @@ public class CampaignReportService {
     private final ContactAttributeService contactAttributeService;
     private final String[] paramHeaders;
     private static final int CHUNK_SIZE = 500;
+    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm");
 
     public CampaignReportService(CampaignDetailService campaignDetailService,
                                  ContactAttributeService contactAttributeService,
@@ -44,9 +45,6 @@ public class CampaignReportService {
     }
 
     public void generateDailyReport(Long startDate, Long endDate, String filePath) {
-        //  log.info("Java temporary directory (java.io.tmpdir): {}", System.getProperty("java.io.tmpdir"));
-
-
         try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
             writeCampaignHistory(startDate,endDate, fileOut);
         } catch (Exception e) {
@@ -76,14 +74,12 @@ public class CampaignReportService {
         Map<String, Integer> map = new LinkedHashMap<>();
         Row headerRow = sheet.createRow(0);
 
-        // header static app.properties
         for (int i = 0; i < paramHeaders.length; i++) {
             String header = paramHeaders[i].trim();
             map.put(header.toLowerCase(), i);
             headerRow.createCell(i).setCellValue(header);
         }
 
-        // dynamic keys
         int startIndex = paramHeaders.length;
         int i = 0;
         for (String key : dynamicKeys) {
@@ -134,7 +130,6 @@ public class CampaignReportService {
                                     Map<String, Integer> headerIndexMap,
                                     int currentRowNum) {
 
-        // Pre-fetch Attribute
         List<UUID> contactIds = chunkData.stream()
                 .map(detail -> detail.getContact().getId())
                 .distinct()
@@ -142,7 +137,6 @@ public class CampaignReportService {
 
         Map<String, Map<String, String>> attributesMap = contactAttributeService.getAttributesMap(contactIds);
 
-        // Loop writing data
         for (CampaignDetail detail : chunkData) {
             Row row = sheet.createRow(currentRowNum++);
 
@@ -189,7 +183,6 @@ public class CampaignReportService {
         }
     }
 
-    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm");
     private String getFormattedDate(Long date) {
         if (date == null || date == 0L) return "";
         return Instant.ofEpochMilli(date)

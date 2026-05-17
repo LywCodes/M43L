@@ -184,8 +184,6 @@ public class UserService {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
-
-
         return JwtResponseDto.builder()
                 .jwt(jwt)
                 .id(user.getId())
@@ -213,7 +211,7 @@ public class UserService {
 
             return DatatypeConverter.printHexBinary(encryptedBytes);
         } catch (Exception e) {
-            throw new RuntimeException("Error encrypting data: " + e.getMessage(), e);
+            throw new SecurityException("Error encrypting data: " + e.getMessage());
         }
     }
 

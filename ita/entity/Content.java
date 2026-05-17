@@ -1,10 +1,10 @@
 package ita.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 @Entity
 @Table(name = "content")
@@ -13,11 +13,14 @@ import lombok.*;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Content extends BaseEntity {
+public class Content extends BaseFullAuditEntity {
 
     @Column(columnDefinition = "TEXT")
-    @JsonIgnore
     private String html;
+
+    @Generated(event = EventType.INSERT)
+    @Column(name = "auto_increment_id", insertable = false, updatable = false)
+    private Long autoIncrementId;
 
     private Integer numberOfParam;
 

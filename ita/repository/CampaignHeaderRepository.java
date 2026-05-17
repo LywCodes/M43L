@@ -25,11 +25,11 @@ public interface CampaignHeaderRepository extends JpaRepository<CampaignHeader, 
     boolean checkExistsByNameActiveAndIdNot(@Param("name") String name, @Param("id") UUID id, @Param("excludedStatuses") Collection<CampaignStatus> excludedStatuses);
 
     default boolean existsByNameActive(String name) {
-        return checkExistsByNameActive(name, Arrays.asList(CampaignStatus.CANCELED, CampaignStatus.REJECTED));
+        return checkExistsByNameActive(name, Arrays.asList(CampaignStatus.CANCELLED, CampaignStatus.REJECTED));
     }
 
     default boolean existsByNameActiveAndIdNot(String name, UUID id) {
-        return checkExistsByNameActiveAndIdNot(name, id, Arrays.asList(CampaignStatus.CANCELED, CampaignStatus.REJECTED));
+        return checkExistsByNameActiveAndIdNot(name, id, Arrays.asList(CampaignStatus.CANCELLED, CampaignStatus.REJECTED));
     }
 
     //cron job auto cancel

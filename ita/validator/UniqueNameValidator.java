@@ -49,12 +49,12 @@ public class UniqueNameValidator implements ConstraintValidator<UniqueName, Stri
     public boolean isValid(String name, ConstraintValidatorContext constraintValidatorContext) {
         return switch (entityType) {
             case ROLE_TYPE -> !roleService.existsByName(name);
-            case ATTACHMENT_TYPE -> !attachmentService.existsByName(name);
-            case CONTENT_TYPE -> !contentService.existsByName(name);
+            case ATTACHMENT_TYPE -> !attachmentService.existsByNameActive(name);
+            case CONTENT_TYPE -> !contentService.existByNameActive(name);
             case USER_TYPE -> !userService.existsByUsername(name);
             case CONTACT_TYPE -> !contactService.existsByEmail(name);
             case CAMPAIGN_HEADER_TYPE -> !campaignHeaderService.existsByNameActive(name);
-            case SENDER_TYPE -> !senderService.existsByEmail(name);
+            case SENDER_TYPE -> !senderService.existsByEmailActive(name);
             case CONTACT_GROUP_TYPE -> !contactGroupService.existsByName(name);
             case PERMISSION_TYPE -> !permissionService.existsByName(name);
             default -> false;

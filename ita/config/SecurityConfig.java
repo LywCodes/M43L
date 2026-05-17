@@ -89,7 +89,7 @@ public class SecurityConfig {
 
             return new SecretKeySpec(keyBytes, ALGORITHM);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Failed to initialize Triple DES key: " + e.getMessage(), e);
+            throw new SecurityException("Failed to initialize Triple DES key: " + e.getMessage());
         }
     }
 

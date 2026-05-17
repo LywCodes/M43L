@@ -13,16 +13,25 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 
 @Configuration
 public class RestTemplateConfig {
 
     @Bean
-    public RestTemplate restTemplate() throws Exception {
+    public RestTemplate restTemplate() {
 
-        SSLContext sslContext = SSLContextBuilder.create()
-                .loadTrustMaterial(TrustAllStrategy.INSTANCE)
-                .build();
+        SSLContext sslContext;
+        try {
+            sslContext = SSLContextBuilder.create()
+                    .loadTrustMaterial(TrustAllStrategy.INSTANCE)
+                    .build();
+        } catch (NoSuchAlgorithmException | KeyManagementException | KeyStoreException e) {
+            throw new SecurityException("Failed to build SSL context: " + e.getMessage());
+        }
 
         TlsSocketStrategy tlsStrategy = ClientTlsStrategyBuilder.create()
                 .setSslContext(sslContext)
@@ -30,7 +39,7 @@ public class RestTemplateConfig {
                 .buildClassic();
 
         PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-                .setTlsSocketStrategy(tlsStrategy) // <-- Method baru pengganti setSSLSocketFactory
+                .setTlsSocketStrategy(tlsStrategy)
                 .build();
 
         CloseableHttpClient httpClient = HttpClients.custom()

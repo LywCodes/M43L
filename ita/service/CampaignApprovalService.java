@@ -46,18 +46,29 @@ public class CampaignApprovalService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void approve(UUID id, ApprovalRequestDto request) throws SchedulerException {
-        CampaignHeader campaign = validateCampaignForApproval(id);
+    public void approve(CampaignApprovalRequestDto request) throws SchedulerException {
+        CampaignHeader campaign = campaignHeaderRepository.findById(request.getCampaignHeaderId())
+                .orElseThrow(() -> new NotFoundException(CAMPAIGN_HEADER_TYPE, "id", request.getCampaignHeaderId().toString()));
+
+        UUID currentUserId = AuthUtil.getUserId();
+
+        if (!Objects.equals(campaign.getApproverId(), currentUserId)) {
+            throw new CustomException("Unauthorized: You are not the assigned approver.");
+        }
+
+        if (campaign.getStatus() != CampaignStatus.WAITING_APPROVAL) {
+            throw new CustomException("Only campaigns in WAITING_APPROVAL status can be approved");
+        }
 
         if (campaign.getType() == CampaignType.IMMEDIATE){
             processApproval(campaign, request);
 
-            log.info("Immediate Campaign {} approved and execution triggered ", id);
+            log.info("Immediate Campaign {} approved and execution triggered ", request.getCampaignHeaderId());
         } else {
             long currentTime = System.currentTimeMillis();
 
             if (currentTime > campaign.getScheduledTime()){
-                campaign.setStatus(CampaignStatus.CANCELED);
+                campaign.setStatus(CampaignStatus.CANCELLED);
                 campaign.setFailedAt(currentTime);
                 campaign.setFailureReason("Scheduled time has passed. Campaign automatically canceled.");
 
@@ -71,40 +82,28 @@ public class CampaignApprovalService {
     }
 
     @Transactional
-    public void reject(UUID id, ApprovalRequestDto request) {
+    public void reject(CampaignApprovalRequestDto request) {
 
-        CampaignHeader campaign = validateCampaignForApproval(id);
+        CampaignHeader campaign = campaignHeaderRepository.findById(request.getCampaignHeaderId())
+                .orElseThrow(() -> new NotFoundException(CAMPAIGN_HEADER_TYPE,"id", request.getCampaignHeaderId().toString())) ;
+
+        UUID currentUserId = AuthUtil.getUserId();
+
+        if (!Objects.equals(campaign.getApproverId(), currentUserId)) {
+            throw new CustomException("Unauthorized: You are not the assigned approver.");
+        }
+
+        if (campaign.getStatus() != CampaignStatus.WAITING_APPROVAL) {
+            throw new CustomException("Only campaigns in WAITING_APPROVAL status can be approved");
+        }
 
         campaign.setStatus(CampaignStatus.REJECTED);
         campaign.setRejectionReason(request.getReason());
 
         campaignHeaderRepository.save(campaign);
-        saveHistory(campaign, CampaignApprovalStatus.REJECTED, request.getReason(), AuthUtil.getUserId());
+
+        saveHistory(campaign, CampaignApprovalStatus.REJECTED, request.getReason(), currentUserId);
     }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void cancelRequest(UUID id, ApprovalRequestDto request) {
-        CampaignHeader campaign = campaignHeaderRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException(CAMPAIGN_HEADER_TYPE, "id", id.toString()));
-
-        UUID currentUserId = AuthUtil.getUserId();
-
-        if (!campaign.getRequesterId().equals(currentUserId)) {
-            throw new CustomException("action denied: you are not the requester from this campaign.");
-        }
-
-        if (campaign.getStatus() != CampaignStatus.WAITING_APPROVAL) {
-            throw new CustomException("Cancel Failed: Campaign already be processed.");
-        }
-
-        campaign.setStatus(CampaignStatus.CANCELED);
-        campaignHeaderRepository.save(campaign);
-
-        saveHistory(campaign, CampaignApprovalStatus.REQUEST_CANCELLED, request.getReason(), currentUserId);
-
-        log.info("Campaign request {} cancelled by requester {}", id, currentUserId);
-    }
-
 
     public Page<ApprovalLogDto> getHistoryLogs(ApprovalHistorySearchCriteria criteria) {
 
@@ -142,6 +141,28 @@ public class CampaignApprovalService {
                         .build());
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelRequest(CampaignApprovalRequestDto request) {
+        CampaignHeader campaign = campaignHeaderRepository.findById(request.getCampaignHeaderId())
+                .orElseThrow(() -> new NotFoundException(CAMPAIGN_HEADER_TYPE, "id", request.getCampaignHeaderId().toString()));
+
+        UUID currentUserId = AuthUtil.getUserId();
+        if (!campaign.getRequesterId().equals(currentUserId)) {
+            throw new CustomException("action denied: you are not the requester from this campaign.");
+        }
+
+        if (campaign.getStatus() != CampaignStatus.WAITING_APPROVAL) {
+            throw new CustomException("Cancel Failed: Campaign already be processed (Approved/Rejected).");
+        }
+
+        campaign.setStatus(CampaignStatus.CANCELLED);
+        campaignHeaderRepository.save(campaign);
+
+        saveHistory(campaign, CampaignApprovalStatus.REQUEST_CANCELLED, request.getReason(), currentUserId);
+
+        log.info("Campaign request {} cancelled by requester {}", request.getCampaignHeaderId(), currentUserId);
+    }
+
 //    @Scheduled(cron = "0 */20 * * * *")
 //    @Transactional
 //    public void processAutoCancel() {
@@ -151,7 +172,7 @@ public class CampaignApprovalService {
 //                .findExpiredScheduledCampaigns(now);
 //
 //        for (CampaignHeader campaignHeader : expired) {
-//            campaignHeader.setStatus(CampaignStatus.CANCELED);
+//            campaignHeader.setStatus(CampaignStatus.CANCELLED);
 //            campaignHeader.setFailureReason("Campaign automatically canceled, approval timeout");
 //
 //            campaignHeaderRepository.save(campaignHeader);
@@ -180,7 +201,7 @@ public class CampaignApprovalService {
         historyRepository.save(history);
     }
 
-    private void processApproval (CampaignHeader campaign, ApprovalRequestDto request) throws SchedulerException {
+    private void processApproval (CampaignHeader campaign, CampaignApprovalRequestDto request) throws SchedulerException {
         UUID currentUserId = AuthUtil.getUserId();
 
         campaign.setStatus(CampaignStatus.SCHEDULED);

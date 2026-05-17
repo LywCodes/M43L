@@ -5,6 +5,8 @@ import ita.enumeration.CampaignStatus;
 import ita.enumeration.CampaignType;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.UUID;
+
 public class CampaignHeaderSpecification {
     private CampaignHeaderSpecification(){}
     public static Specification<CampaignHeader> statusEqual(CampaignStatus status) {
@@ -47,6 +49,14 @@ public class CampaignHeaderSpecification {
 
             return criteriaBuilder.lessThanOrEqualTo(root.get("scheduledTime"), scheduledTime);
         };
+    }
+
+    public static Specification<CampaignHeader> approver(UUID approverId) {
+        return ((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("approverId"), approverId));
+    }
+
+    public static Specification<CampaignHeader> requester(UUID requesterId) {
+        return ((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("requesterId"), requesterId));
     }
 
 }

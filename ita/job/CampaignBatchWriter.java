@@ -1,17 +1,20 @@
-
 package ita.job;
 
 import ita.dto.EmailBatchDto;
 import ita.dto.EmailTaskDto;
 import ita.entity.CampaignDetail;
 import ita.enumeration.CampaignDetailStatus;
-import ita.repository.CampaignDetailRepository;
+import ita.service.CampaignDetailService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,14 +23,15 @@ import java.util.List;
 @Component
 public class CampaignBatchWriter implements ItemWriter<EmailBatchDto> {
 
-    private final CampaignDetailRepository campaignDetailRepository;
+    private final CampaignDetailService campaignDetailService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String emailTopic;
 
-    public CampaignBatchWriter(CampaignDetailRepository campaignDetailRepository,
+    public CampaignBatchWriter(@Lazy CampaignDetailService campaignDetailService,
                                KafkaTemplate<String, Object> kafkaTemplate,
                                @Value("${spring.kafka.topic.email}") String emailTopic) {
-        this.campaignDetailRepository = campaignDetailRepository;
+
+        this.campaignDetailService = campaignDetailService;
         this.kafkaTemplate = kafkaTemplate;
         this.emailTopic = emailTopic;
     }
@@ -35,41 +39,49 @@ public class CampaignBatchWriter implements ItemWriter<EmailBatchDto> {
     @Override
     public void write(Chunk<? extends EmailBatchDto> chunk){
         List<CampaignDetail> detailsToSave = new ArrayList<>();
-        log.info("[DB Transaction] save {} data to db by {}", chunk.getItems().size(), Thread.currentThread());
 
         for (EmailBatchDto item : chunk.getItems()) {
             detailsToSave.add(item.getCampaignDetail());
         }
 
-        // Save All ke Database
-        campaignDetailRepository.saveAll(detailsToSave);
+        campaignDetailService.saveAll(detailsToSave);
 
-        for (EmailBatchDto item : chunk.getItems()) {
-            if (!item.isInvalidEmail()) {
-                EmailTaskDto taskDto = item.getEmailTaskDto();
-                taskDto.setCampaignDetailId(item.getCampaignDetail().getId());
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                List<CampaignDetail> failedDetails = new ArrayList<>();
 
-                String trackerId = item.getCampaignDetail().getTrackerId();
+                for (EmailBatchDto item : chunk.getItems()) {
+                    if (!item.isInvalidEmail()) {
+                        String trackerId = item.getCampaignDetail().getTrackerId();
+                        EmailTaskDto taskDto = item.getEmailTaskDto();
+                        taskDto.setCampaignDetailId(item.getCampaignDetail().getId());
 
-                try{
-                    kafkaTemplate.send(emailTopic, trackerId, taskDto).get();
-                } catch (InterruptedException e){
-                    log.error("Kafka interrupted while waiting Kafka to {}: {} ", trackerId, e.getMessage());
-                    Thread.currentThread().interrupt();
+                        try {
+                            kafkaTemplate.send(emailTopic, trackerId, taskDto).get();
+                        } catch (InterruptedException e) {
+                            log.error("Kafka interrupted while waiting Kafka to {}: {} ", trackerId, e.getMessage());
+                            Thread.currentThread().interrupt();
 
-                    throw new RuntimeException("Proses Batch interrupted", e);
-                } catch (Exception e){
-                    log.error("failed send to Kafka for {}: {}", item.getEmailTaskDto().getRecipientEmail(), e.getMessage());
+                            throw new RuntimeException("Proses Batch interrupted", e);
+                        } catch (Exception e) {
+                            log.error("failed send to Kafka for {}: {}", item.getEmailTaskDto().getRecipientEmail(), e.getMessage());
 
-                    CampaignDetail failedDetail = item.getCampaignDetail();
+                            CampaignDetail failedDetail = item.getCampaignDetail();
 
-                    failedDetail.setStatus(CampaignDetailStatus.SOFT_BOUNCED);
-                    failedDetail.setSoftBouncedAt(System.currentTimeMillis());
-                    failedDetail.setSentAt(0L);
+                            failedDetail.setStatus(CampaignDetailStatus.SOFT_BOUNCED);
+                            failedDetail.setSoftBouncedAt(System.currentTimeMillis());
+                            failedDetail.setSentAt(0L);
+                            failedDetails.add(failedDetail);
+                        }
+                    }
 
-                    campaignDetailRepository.save(failedDetail);
+                    if (!failedDetails.isEmpty()) {
+                        campaignDetailService.saveAllFailed(failedDetails);
+                    }
                 }
             }
-        }
+
+        });
     }
 }

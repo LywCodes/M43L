@@ -23,4 +23,6 @@ public class ContactGroup extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "contact_id"))
     private List<Contact> contacts;
 
+    private Integer size;
+
 }

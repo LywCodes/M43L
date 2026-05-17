@@ -3,6 +3,8 @@ package ita.controller;
 import ita.aspect.GenerateAuditLog;
 import ita.aspect.GenerateRequestLog;
 import ita.dto.*;
+import ita.entity.Attachment;
+import ita.enumeration.ApprovalStatus;
 import ita.projection.BaseProjection;
 import ita.property.ResponseProperty;
 import ita.service.AttachmentService;
@@ -37,8 +39,10 @@ public class AttachmentController {
     @GetMapping
     @PreAuthorize("hasAuthority('READ_ATTACHMENT')")
     @GenerateAuditLog(entityType = ATTACHMENT_TYPE, operationType = READ_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria) {
-        Page<BaseProjection> attachments = attachmentService.findByFilter(searchCriteria);
+    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria,
+                                                          @RequestParam (required = false) ApprovalStatus status
+                                                          ) {
+        Page<Attachment> attachments = attachmentService.findByFilter(searchCriteria, status);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getAttachment(),
                 responseProperty.getSuccess().getMessage().getAttachment(), attachments);
@@ -50,7 +54,7 @@ public class AttachmentController {
     @PreAuthorize("hasAuthority('UPDATE_ATTACHMENT')")
     @GenerateAuditLog(entityType = ATTACHMENT_TYPE, operationType = READ_OPERATION)
     public ResponseEntity<ResponseDto<Object>> findById(@PathVariable String id) {
-        AttachmentResponseDto attachment = attachmentService.findDtoById(UUID.fromString(id));
+        Attachment attachment = attachmentService.findById(UUID.fromString(id));
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getAttachment(),
                 responseProperty.getSuccess().getMessage().getAttachment(), attachment);
@@ -96,4 +100,19 @@ public class AttachmentController {
         return ResponseEntity.status(200).body(responseDto);
     }
 
+    @PostMapping("{id}/approvals")
+    @PreAuthorize("hasAuthority('APPROVE_SENDER')")
+    @GenerateRequestLog(entityType = SENDER_TYPE, operationType = APPROVE_OPERATION)
+    @GenerateAuditLog(entityType = SENDER_TYPE, operationType = APPROVE_OPERATION)
+    public ResponseEntity<ResponseDto<Object>> approveSender(@PathVariable String id,
+                                                             @Valid @RequestBody ApprovalRequestDto request) {
+
+        Attachment attachment = attachmentService.processAttachment(UUID.fromString(id), request);
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(
+                responseProperty.getSuccess().getCode().getSender(),
+                responseProperty.getSuccess().getMessage().getSender(), attachment);
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
 }

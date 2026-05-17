@@ -83,6 +83,7 @@ public class ContactGroupService {
                 ContactGroupResponseDto.builder()
                         .id(contactGroup.getId())
                         .name(contactGroup.getName())
+                        .size(contactGroup.getSize())
                         .build()).toList();
 
         return new PageImpl<>(contactGroupResponseDtos, pageable, contactGroups.getTotalElements());
@@ -205,8 +206,6 @@ public class ContactGroupService {
         MDC.put("user", name);
         MDC.put("actual_class", simpleName);
 
-        log.info("Request Body: {}", contactGroup);
-
         return contactGroupRepository.save(contactGroup);
     }
 
@@ -247,7 +246,7 @@ public class ContactGroupService {
 
             return new ByteArrayResource(bytes);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IllegalArgumentException("Failed to export contact group: " + e.getMessage());
         }
     }
 

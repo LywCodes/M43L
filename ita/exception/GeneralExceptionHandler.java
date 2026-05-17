@@ -66,4 +66,13 @@ public class GeneralExceptionHandler {
 
         return ResponseEntity.status(500).body(responseDto);
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ResponseDto<Object>> handleNullException(IllegalArgumentException exception) {
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getInvalidInput().getCode(),
+                responseProperty.getInvalidInput().getMessage(), generatePayload(exception.getMessage()));
+
+        return ResponseEntity.status(400).body(responseDto);
+    }
 }

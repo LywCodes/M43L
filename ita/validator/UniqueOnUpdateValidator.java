@@ -60,7 +60,7 @@ public class UniqueOnUpdateValidator implements ConstraintValidator<UniqueOnUpda
             case ATTACHMENT_TYPE -> {
                 AttachmentUpdateDto attachment = (AttachmentUpdateDto) value;
 
-                isValid = attachmentService.isUniqueForUpdate(attachment.getName(), attachment.getId());
+                isValid = attachmentService.isUniqueForUpdateActive(attachment.getName(), attachment.getId());
             }
             case USER_TYPE -> {
                 UserUpdateDto user = (UserUpdateDto) value;
@@ -75,7 +75,7 @@ public class UniqueOnUpdateValidator implements ConstraintValidator<UniqueOnUpda
             case SENDER_TYPE -> {
                 SenderUpdateDto sender = (SenderUpdateDto) value;
 
-                isValid = senderService.isUniqueForUpdate(sender.getEmail(), sender.getId());
+                isValid = senderService.isUniqueForUpdateActive(sender.getEmail(), sender.getId());
             }
             case CONTACT_GROUP_TYPE -> {
                 ContactGroupUpdateDto contactGroup = (ContactGroupUpdateDto) value;

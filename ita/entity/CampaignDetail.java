@@ -38,7 +38,7 @@ public class CampaignDetail {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
-    private CampaignDetailStatus status = CampaignDetailStatus.SENT;
+    private CampaignDetailStatus status = CampaignDetailStatus.QUEUED;
 
     private long sentAt;
     private long softBouncedAt;

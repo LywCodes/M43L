@@ -8,6 +8,7 @@ import ita.service.CampaignApprovalService;
 import ita.service.CampaignHeaderService;
 import ita.util.ResponseDtoUtil;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.quartz.SchedulerException;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -15,14 +16,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
-import java.util.List;
-import java.util.UUID;
-
 import static ita.enumeration.EntityType.CAMPAIGN_HEADER_TYPE;
 import static ita.enumeration.OperationType.*;
 
 @RestController
 @RequestMapping("/api/campaign/approval")
+@Slf4j
 public class CampaignApprovalController {
     private final CampaignApprovalService campaignApprovalService;
     private final CampaignHeaderService campaignHeaderService;
@@ -38,16 +37,15 @@ public class CampaignApprovalController {
         this.responseProperty = responseProperty;
     }
 
-    @PatchMapping("/{id}/approve")
+    @PutMapping("approve")
     @PreAuthorize("hasAuthority('APPROVE_CAMPAIGN')")
     @GenerateRequestLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = APPROVE_OPERATION)
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = APPROVE_OPERATION)
     public ResponseEntity<ResponseDto<Object>>approve(
-            @PathVariable UUID id,
-            @Valid @RequestBody ApprovalRequestDto request
+            @Valid @RequestBody CampaignApprovalRequestDto request
             ) throws SchedulerException {
 
-        campaignApprovalService.approve(id, request);
+        campaignApprovalService.approve(request);
         ResponseDto<Object>responseDto = ResponseDtoUtil.generateResponse(
                 responseProperty.getSuccess().getCode().getCampaign(),
                 responseProperty.getSuccess().getMessage().getCampaign(), "campaign approved"
@@ -56,15 +54,15 @@ public class CampaignApprovalController {
         return ResponseEntity.status(200).body(responseDto);
     }
 
-    @PatchMapping("/{id}/reject")
+    @PutMapping("reject")
     @PreAuthorize("hasAuthority('APPROVE_CAMPAIGN')")
     @GenerateRequestLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = REJECT_OPERATION)
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = REJECT_OPERATION)
     public ResponseEntity<ResponseDto<Object>>reject(
-            @PathVariable UUID id,
-            @Valid @RequestBody ApprovalRequestDto request
+            @Valid @RequestBody CampaignApprovalRequestDto request
             )  {
-        campaignApprovalService.reject(id, request);
+        log.info(request.toString());
+        campaignApprovalService.reject(request);
 
         ResponseDto<Object>responseDto = ResponseDtoUtil.generateResponse(
                 responseProperty.getSuccess().getCode().getCampaign(),
@@ -74,15 +72,14 @@ public class CampaignApprovalController {
         return ResponseEntity.status(200).body(responseDto);
     }
 
-    @PatchMapping("/{id}/cancel")
+    @PutMapping("cancel")
     @PreAuthorize("hasAuthority('CREATE_CAMPAIGN')")
     @GenerateRequestLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = UPDATE_OPERATION)
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = UPDATE_OPERATION)
     public ResponseEntity<ResponseDto<Object>>cancel(
-            @PathVariable UUID id,
-            @Valid @RequestBody ApprovalRequestDto request
+            @Valid @RequestBody CampaignApprovalRequestDto request
             )  {
-        campaignApprovalService.cancelRequest(id, request);
+        campaignApprovalService.cancelRequest(request);
 
         ResponseDto<Object>responseDto =  ResponseDtoUtil.generateResponse(
                 responseProperty.getSuccess().getCode().getCampaign(),
@@ -92,12 +89,11 @@ public class CampaignApprovalController {
         return ResponseEntity.status(200).body(responseDto);
     }
 
-    @GetMapping("/pending")
+    @GetMapping
     @PreAuthorize("hasAuthority('APPROVE_CAMPAIGN')")
     @GenerateAuditLog(entityType = CAMPAIGN_HEADER_TYPE, operationType = READ_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> getPending() {
-
-        List<CampaignHeaderResponseDto> campaignHeader = campaignHeaderService.getPendingApprovals();
+    public ResponseEntity<ResponseDto<Object>> getApproval(ApprovalSearchCriteria searchCriteria) {
+        Page<CampaignApprovalResponseDto> campaignHeader = campaignHeaderService.getAllApproval(searchCriteria);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(
                 responseProperty.getSuccess().getCode().getCampaign(),

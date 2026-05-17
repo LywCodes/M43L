@@ -9,8 +9,8 @@ public enum CampaignApprovalStatus {
     REQUEST_SUBMITTED("Submitted"),
     APPROVED("Approved"),
     REJECTED("Rejected"),
-    AUTO_CANCEL("Cancelled"),
-    REQUEST_CANCELLED("Expired");
+    AUTO_CANCEL("Expired"),
+    REQUEST_CANCELLED("Cancelled");
 
     private final String value;
 }

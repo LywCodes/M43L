@@ -14,10 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 
 import org.springframework.core.MethodParameter;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +49,7 @@ public class CampaignHeaderService {
     private final  ContentValidationService contentValidationService;
     private static final String CAMPAIGN_JOB = "campaign-jobs";
     private final CampaignApprovalService approvalService;
+    private final UserService userService;
 
     public CampaignHeaderService(CampaignHeaderRepository campaignHeaderRepository,
                                  CampaignDetailService campaignDetailService,
@@ -61,7 +59,7 @@ public class CampaignHeaderService {
                                  ContactGroupService contactGroupService,
                                  ContentValidationService contentValidationService,
                                  Scheduler quartzScheduler,
-                                 CampaignApprovalService approvalService) {
+                                 CampaignApprovalService approvalService, UserService userService) {
         this.campaignHeaderRepository = campaignHeaderRepository;
         this.campaignDetailService = campaignDetailService;
         this.senderService = senderService;
@@ -71,6 +69,7 @@ public class CampaignHeaderService {
         this.contentValidationService = contentValidationService;
         this.quartzScheduler = quartzScheduler;
         this.approvalService = approvalService;
+        this.userService = userService;
     }
 
     @Transactional
@@ -78,7 +77,16 @@ public class CampaignHeaderService {
     public CampaignHeaderResponseDto createScheduledCampaign(CampaignHeaderRequestDto request) {
 
         Sender sender = senderService.findById(UUID.fromString(request.getSenderId()));
+        if (!sender.isApproved()) {
+            throw new CustomException("Sender is not approved");
+        }
+
         Content content = contentService.findById(UUID.fromString(request.getContentId()));
+
+        if (!content.isApproved()) {
+            throw new CustomException("content is not approved");
+        }
+
         ContactGroup contactGroup = contactGroupService.findById(UUID.fromString(request.getContactGroupId()));
 
         validateCampaignBeforeSending(content.getId(), contactGroup.getId());
@@ -86,6 +94,10 @@ public class CampaignHeaderService {
         Attachment attachment = null;
         if (request.getAttachmentId() != null && !request.getAttachmentId().trim().isEmpty()) {
             attachment = attachmentService.findById(UUID.fromString(request.getAttachmentId()));
+
+            if (!attachment.isApproved()) {
+                throw new CustomException("attachment is not approved");
+            }
         }
 
         CampaignStatus status = Boolean.TRUE.equals(request.getIsDraft()) ? DRAFT : WAITING_APPROVAL;
@@ -140,8 +152,24 @@ public class CampaignHeaderService {
             throw new MethodArgumentNotValidException(parameter, result);
         }
 
+        UUID userId = AuthUtil.getUserId();
+
+        if (userId.equals(updateDto.getApproverId())) {
+            throw new CustomException("You can't sign yourself as approver for this campaign");
+        }
+
         Sender sender = senderService.findById(UUID.fromString(updateDto.getSenderId()));
+
+        if (!sender.isApproved()) {
+            throw new CustomException("Sender is not approved");
+        }
+
         Content content = contentService.findById(UUID.fromString(updateDto.getContentId()));
+
+        if (!content.isApproved()) {
+            throw new CustomException("content is not approved");
+        }
+
         ContactGroup contactGroup = contactGroupService.findById(UUID.fromString(updateDto.getContactGroupId()));
 
         validateCampaignBeforeSending(content.getId(), contactGroup.getId());
@@ -149,6 +177,10 @@ public class CampaignHeaderService {
         Attachment attachment = null;
         if (updateDto.getAttachmentId() != null && !updateDto.getAttachmentId().trim().isEmpty()) {
             attachment = attachmentService.findById(UUID.fromString(updateDto.getAttachmentId()));
+
+            if (!content.isApproved()) {
+                throw new CustomException("content is not approved");
+            }
         }
 
         existing.setName(updateDto.getName());
@@ -190,6 +222,32 @@ public class CampaignHeaderService {
                 .build();
     }
 
+    private CampaignApprovalResponseDto mapToApprovalResponseDto(CampaignHeader campaignHeader) {
+        LocalUser requester = userService.findById(campaignHeader.getRequesterId());
+        LocalUser approver = userService.findById(campaignHeader.getApproverId());
+
+        return CampaignApprovalResponseDto.builder()
+                .id(campaignHeader.getId())
+                .name(campaignHeader.getName())
+                .type(campaignHeader.getType())
+                .status(campaignHeader.getStatus())
+                .senderId(campaignHeader.getSender().getId())
+                .senderName(campaignHeader.getSender().getName())
+                .contentId(campaignHeader.getContent().getId())
+                .contentName(campaignHeader.getContent().getName())
+                .attachmentId(campaignHeader.getAttachment() != null ? campaignHeader.getAttachment().getId() : null)
+                .attachmentName(campaignHeader.getAttachment() != null ? campaignHeader.getAttachment().getName() : null)
+                .contactGroupId(campaignHeader.getContactGroup().getId())
+                .contactGroupName(campaignHeader.getContactGroup().getName())
+                .scheduledTime(campaignHeader.getScheduledTime())
+                .requesterId(requester.getId())
+                .requesterName(requester.getName())
+                .approverId(approver.getId())
+                .approverName(approver.getName())
+                .rejectionReason(campaignHeader.getRejectionReason())
+                .build();
+    }
+
     public CampaignHeaderResponseDto findDtoById(UUID id) {
         return mapToResponseDto(findById(id));
     }
@@ -216,7 +274,7 @@ public class CampaignHeaderService {
         }
     }
 
-    public List<CampaignHeaderResponseDto>getPendingApprovals(){
+    public List<CampaignHeaderResponseDto>getPendingApprovals(ApprovalSearchCriteria searchCriteria){
         UUID currentUserId = AuthUtil.getUserId();
 
         List<CampaignHeader>pendingCampaigns = campaignHeaderRepository.findPendingApprovals(currentUserId);
@@ -224,6 +282,31 @@ public class CampaignHeaderService {
         return pendingCampaigns.stream()
                 .map(this::mapToResponseDto)
                 .collect(Collectors.toList());
+    }
+
+    public Page<CampaignApprovalResponseDto> getAllApproval(ApprovalSearchCriteria searchCriteria) {
+        int pageSize = (searchCriteria.getSize() == 999) ? Integer.MAX_VALUE : searchCriteria.getSize();
+
+        Sort sort = searchCriteria.getType().equalsIgnoreCase("desc")
+                ? Sort.by(searchCriteria.getParam()).descending()
+                : Sort.by(searchCriteria.getParam()).ascending();
+
+        Pageable pageable = PageRequest.of(searchCriteria.getPage(), pageSize, sort);
+
+        UUID currentUserId = AuthUtil.getUserId();
+
+        Specification<CampaignHeader> campaignHeaderSpecification = Specification.allOf(
+                CampaignHeaderSpecification.statusEqual(searchCriteria.getStatus())
+                        .and(CampaignHeaderSpecification.typeEqual(searchCriteria.getCampaignType()))
+                        .and(CampaignHeaderSpecification.nameLike(searchCriteria.getName()))
+                        .and(CampaignHeaderSpecification.approver(currentUserId).or(CampaignHeaderSpecification.requester(currentUserId)))
+        );
+
+        Page<CampaignHeader> campaignHeaders = campaignHeaderRepository.findAll(campaignHeaderSpecification, pageable);
+
+        List<CampaignApprovalResponseDto> campaignApprovalResponseDtos = campaignHeaders.stream().map(this::mapToApprovalResponseDto).toList();
+
+        return new PageImpl<>(campaignApprovalResponseDtos, pageable, campaignHeaders.getTotalElements());
     }
 
     public void executeCampaign(String campaignId) {
@@ -390,7 +473,6 @@ public class CampaignHeaderService {
                     String.format("Template validation failed, missing attributes in group: [%s]", missingAttributes)
             );
         }
-        log.info("campaign validation passed.");
     }
 
 }

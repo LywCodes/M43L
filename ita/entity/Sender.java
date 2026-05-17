@@ -11,7 +11,7 @@ import lombok.*;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Sender extends BaseEntity {
+public class Sender extends BaseFullAuditEntity {
     private String email;
 
 }

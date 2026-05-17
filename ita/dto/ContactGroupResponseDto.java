@@ -13,5 +13,6 @@ public class ContactGroupResponseDto {
 
     private UUID id;
     private String name;
+    private Integer size;
 
 }

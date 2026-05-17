@@ -2,11 +2,12 @@ package ita.controller;
 
 import ita.aspect.GenerateAuditLog;
 import ita.aspect.GenerateRequestLog;
-import ita.dto.BaseSearchCriteriaDto;
-import ita.dto.ContentRequestDto;
-import ita.dto.ResponseDto;
+import ita.dto.*;
 import ita.entity.Content;
+import ita.enumeration.ApprovalStatus;
+import ita.projection.BaseAutoIncrementIdProjection;
 import ita.projection.BaseProjection;
+import ita.projection.ContentProjection;
 import ita.property.ResponseProperty;
 import ita.service.ContentService;
 import ita.util.ResponseDtoUtil;
@@ -36,8 +37,21 @@ public class ContentController {
     @GetMapping
     @PreAuthorize("hasAuthority('READ_CONTENT')")
     @GenerateAuditLog(entityType = CONTENT_TYPE, operationType = READ_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria) {
-        Page<BaseProjection> contents = contentService.findAllContent(searchCriteria);
+    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria,
+                                                          @RequestParam (required = false) ApprovalStatus status) {
+        Page<ContentProjection> contents = contentService.findAllContent(searchCriteria, status);
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getContent(),
+                responseProperty.getSuccess().getMessage().getContent(), contents);
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
+
+    @GetMapping("projection")
+    @PreAuthorize("hasAuthority('READ_CONTENT')")
+    @GenerateAuditLog(entityType = CONTENT_TYPE, operationType = READ_OPERATION)
+    public ResponseEntity<ResponseDto<Object>> findBaseProjection(BaseSearchCriteriaDto searchCriteria) {
+        Page<BaseAutoIncrementIdProjection> contents = contentService.findBaseProjection(searchCriteria);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getContent(),
                 responseProperty.getSuccess().getMessage().getContent(), contents);
@@ -48,7 +62,7 @@ public class ContentController {
     @GetMapping("{id}")
     @PreAuthorize("hasAuthority('UPDATE_CONTENT')")
     public ResponseEntity<ResponseDto<Object>> findById(@PathVariable String id) {
-        Content content = contentService.findById(UUID.fromString(id));
+        ContentResponseDto content = contentService.findDecodedHtmlById(UUID.fromString(id));
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getContent(),
                 responseProperty.getSuccess().getMessage().getContent(), content);
@@ -77,6 +91,21 @@ public class ContentController {
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getContent(),
                 responseProperty.getSuccess().getMessage().getContent(), ResponseDtoUtil.generateDeleteMessage(id, CONTENT_TYPE));
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
+
+    @PostMapping("{id}/approvals")
+    @PreAuthorize("hasAuthority('APPROVE_CONTENT')")
+    @GenerateRequestLog(entityType = CONTENT_TYPE, operationType =  APPROVE_OPERATION)
+    @GenerateAuditLog(entityType = CONTENT_TYPE, operationType = APPROVE_OPERATION)
+    public ResponseEntity<ResponseDto<Object>> approveContent(@PathVariable String id,
+                                                              @Valid @RequestBody ApprovalRequestDto request) {
+        Content content = contentService.processApproval(UUID.fromString(id), request);
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(
+                responseProperty.getSuccess().getCode().getSender(),
+                responseProperty.getSuccess().getMessage().getSender(), content);
 
         return ResponseEntity.status(200).body(responseDto);
     }

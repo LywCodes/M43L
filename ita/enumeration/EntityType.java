@@ -20,6 +20,7 @@ public enum EntityType {
     STATISTIC_TYPE("Statistic"),
     ATTACHMENT_TYPE("Attachment"),
     PERMISSION_TYPE("Permission"),
+    AUDIT_TYPE("Audit"),
     ERROR_TYPE("Error"),
     NULL_TYPE("Null");
 

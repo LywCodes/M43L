@@ -1,5 +1,7 @@
 package ita.dto;
 
+import ita.validator.FileSize;
+import ita.validator.HtmlSize;
 import ita.validator.UniqueName;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +20,8 @@ public class ContentRequestDto {
     @UniqueName(message = "{unique}", value = CONTENT_TYPE, field = "name")
     private String name;
 
+    @NotBlank(message = "{mandatory.string}")
+    @HtmlSize(maxKB = 500, message = "{size.html}")
     private String html;
 
     @NotNull(message = "{mandatory.integer}")

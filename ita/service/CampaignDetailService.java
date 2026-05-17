@@ -16,12 +16,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 
 import static ita.enumeration.EntityType.CAMPAIGN_DETAIL_TYPE;
 
@@ -128,6 +128,17 @@ public class CampaignDetailService {
 
     public void updateCampaign(CampaignDetail campaignDetail) {
         campaignDetailRepository.save(campaignDetail);
+    }
+
+    @Transactional
+    public void saveAll(List<CampaignDetail> details) {
+        campaignDetailRepository.saveAll(details);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveAllFailed(List<CampaignDetail> failedDetails) {
+        campaignDetailRepository.saveAll(failedDetails);
+        log.warn("[Kafka failed] {}, mark as soft bounce", failedDetails.size());
     }
 
 }

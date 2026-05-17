@@ -53,7 +53,7 @@ public class CampaignBatchProcessor implements ItemProcessor<Contact, EmailBatch
 
     @Override
     public EmailBatchDto process(Contact contact)  {
-        log.info("Processing Contact ID{}, email: {} by {}",contact.getId() ,contact.getEmail(), Thread.currentThread());
+        // log.info("Processing Contact ID{}, email: {} by {}",contact.getId() ,contact.getEmail(), Thread.currentThread());
         String email = contact.getEmail();
         String trackerId = email.split("@")[0] + UUID.randomUUID();
 

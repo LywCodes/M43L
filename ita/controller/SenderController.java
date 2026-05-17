@@ -2,11 +2,9 @@ package ita.controller;
 
 import ita.aspect.GenerateAuditLog;
 import ita.aspect.GenerateRequestLog;
-import ita.dto.BaseSearchCriteriaDto;
-import ita.dto.ResponseDto;
-import ita.dto.SenderRequestDto;
-import ita.dto.SenderUpdateDto;
+import ita.dto.*;
 import ita.entity.Sender;
+import ita.enumeration.ApprovalStatus;
 import ita.property.ResponseProperty;
 import ita.service.SenderService;
 import ita.util.ResponseDtoUtil;
@@ -36,8 +34,21 @@ public class SenderController {
     @GetMapping
     @PreAuthorize("hasAuthority('READ_SENDER')")
     @GenerateAuditLog(entityType = SENDER_TYPE, operationType = READ_OPERATION)
-    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria) {
-        Page<Sender> senders = senderService.findAllSender(searchCriteria);
+    public ResponseEntity<ResponseDto<Object>> findBySort(BaseSearchCriteriaDto searchCriteria,
+                                                          @RequestParam (required = false) ApprovalStatus status) {
+        Page<Sender> senders = senderService.findAllSender(searchCriteria, status);
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getSender(),
+                responseProperty.getSuccess().getMessage().getSender(), senders);
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
+
+    @GetMapping("projection")
+    @PreAuthorize("hasAuthority('READ_SENDER')")
+    @GenerateAuditLog(entityType = SENDER_TYPE, operationType = READ_OPERATION)
+    public ResponseEntity<ResponseDto<Object>> findProjection(BaseSearchCriteriaDto searchCriteria) {
+        Page<SenderResponseDto> senders = senderService.findProjection(searchCriteria);
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getSender(),
                 responseProperty.getSuccess().getMessage().getSender(), senders);
@@ -91,6 +102,22 @@ public class SenderController {
 
         ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(responseProperty.getSuccess().getCode().getSender(),
                 responseProperty.getSuccess().getMessage().getSender(), ResponseDtoUtil.generateDeleteMessage(id, SENDER_TYPE));
+
+        return ResponseEntity.status(200).body(responseDto);
+    }
+
+    @PostMapping("{id}/approvals")
+    @PreAuthorize("hasAuthority('APPROVE_SENDER')")
+    @GenerateRequestLog(entityType = SENDER_TYPE, operationType = APPROVE_OPERATION)
+    @GenerateAuditLog(entityType = SENDER_TYPE, operationType = APPROVE_OPERATION)
+    public ResponseEntity<ResponseDto<Object>> approveSender(@PathVariable String id,
+                                                             @Valid @RequestBody ApprovalRequestDto request) {
+
+        Sender updatedSender = senderService.processApproval(UUID.fromString(id), request);
+
+        ResponseDto<Object> responseDto = ResponseDtoUtil.generateResponse(
+                responseProperty.getSuccess().getCode().getSender(),
+                responseProperty.getSuccess().getMessage().getSender(), updatedSender);
 
         return ResponseEntity.status(200).body(responseDto);
     }

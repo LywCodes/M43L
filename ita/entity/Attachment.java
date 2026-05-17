@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
-public class Attachment extends BaseEntity {
+public class Attachment extends BaseFullAuditEntity {
 
     @Lob
     @Column(length = 100000)
